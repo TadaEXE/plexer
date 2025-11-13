@@ -15,28 +15,36 @@ namespace Plexer
   {
     public string? Name { get; set; }
     public bool IsNamed => Name is not null;
-    public bool IsOptional { get; set; } = false;
+    public NodeOption Option { get; set; } = NodeOption.ExactlyOne;
+    public IDataContainer? AttachedData { get; set; } = null;
+    public bool HasDataAttached => AttachedData is not null;
 
     public Node() { }
 
+    public Node(Node node)
+    {
+      Name = node.Name;
+      Option = node.Option;
+      AttachedData = node.AttachedData;
+    }
+
     public Node(string name) => Name = name;
+
+    public void AttachDataContainer<T>()
+      where T : IParsable<T> => AttachedData = new DataContainer<T>();
 
     public virtual Node WithName(string name)
     {
-      return new Node(name);
+      var tmp = new Node(this);
+      tmp.Name = name;
+      return tmp;
     }
 
-    public virtual Node Optional()
+    public virtual Node WithOption(NodeOption option)
     {
-      if (Name is null)
-      {
-        var unnamed = new Node();
-        unnamed.IsOptional = true;
-        return unnamed;
-      }
-      var named = new Node(Name);
-      named.IsOptional = true;
-      return named;
+      var tmp = new Node(this);
+      tmp.Option = option;
+      return tmp;
     }
 
     public virtual List<Node> Unpack()
@@ -91,18 +99,15 @@ namespace Plexer
       return (base.Name ?? "") + (inner ? "" : $": '{Chars}'");
     }
 
-    public override Symbol Optional()
+    public override Symbol WithOption(NodeOption option)
     {
-      if (base.Name is null)
-      {
-        var unnamed = new Symbol(Chars);
-        unnamed.IsOptional = true;
-        return unnamed;
-      }
-      var named = new Symbol(base.Name, Chars);
-      named.IsOptional = true;
-      return named;
+      var tmp = new Symbol(this);
+      tmp.Option = option;
+      return tmp;
     }
+
+    public Symbol(Symbol symbol)
+      : base(symbol) => Chars = symbol.Chars;
 
     public Symbol(string chars)
       : base() => Chars = chars;
@@ -120,18 +125,15 @@ namespace Plexer
       return (base.Name ?? "") + (inner ? "" : $": \\{RegEx}\\");
     }
 
-    public override Pattern Optional()
+    public override Pattern WithOption(NodeOption option)
     {
-      if (base.Name is null)
-      {
-        var unnamed = new Pattern(RegEx);
-        unnamed.IsOptional = true;
-        return unnamed;
-      }
-      var named = new Pattern(base.Name, RegEx);
-      named.IsOptional = true;
-      return named;
+      var tmp = new Pattern(this);
+      tmp.Option = option;
+      return tmp;
     }
+
+    public Pattern(Pattern pattern)
+      : base(pattern) => RegEx = pattern.RegEx;
 
     public Pattern(string regEx)
       : base() => RegEx = regEx;
@@ -140,31 +142,22 @@ namespace Plexer
       : base(name) => RegEx = regEx;
   }
 
-  public class Group : Node
-  {
-    public List<Node> Nodes = new List<Node>();
-  }
-
   public class Chain : Node
   {
     public List<Node> Nodes = new List<Node>();
 
     public override Chain WithName(string name)
     {
-      return new Chain(name, Nodes);
+      var tmp = new Chain(this);
+      tmp.Name = name;
+      return tmp;
     }
 
-    public override Chain Optional()
+    public override Chain WithOption(NodeOption option)
     {
-      if (base.Name is null)
-      {
-        var unnamed = new Chain(Nodes);
-        unnamed.IsOptional = true;
-        return unnamed;
-      }
-      var named = new Chain(base.Name, Nodes);
-      named.IsOptional = true;
-      return named;
+      var tmp = new Chain(this);
+      tmp.Option = option;
+      return tmp;
     }
 
     public override List<Node> Unpack()
@@ -178,11 +171,14 @@ namespace Plexer
     {
       string res = inner ? "(" : base.ToString() + ": ";
       res += string.Join(" ", Nodes.Select(n => n.ToString(true)));
-      return $"{res}{(inner ? ")" : "")}{(IsOptional ? "?" : "")}{(inner ? "" : ";")}";
+      return $"{res}{(inner ? ")" : "")}{NodeOptions.ToString(Option)}{(inner ? "" : ";")}";
     }
 
     public Chain()
       : base() { }
+
+    public Chain(Chain chain)
+      : base(chain) => Nodes = chain.Nodes;
 
     public Chain(string name)
       : base(name) { }
@@ -200,20 +196,16 @@ namespace Plexer
 
     public override Collection WithName(string name)
     {
-      return new Collection(name, Nodes);
+      var tmp = new Collection(this);
+      tmp.Name = name;
+      return tmp;
     }
 
-    public override Collection Optional()
+    public override Collection WithOption(NodeOption option)
     {
-      if (base.Name is null)
-      {
-        var unnamed = new Collection(Nodes);
-        unnamed.IsOptional = true;
-        return unnamed;
-      }
-      var named = new Collection(base.Name, Nodes);
-      named.IsOptional = true;
-      return named;
+      var tmp = new Collection(this);
+      tmp.Option = option;
+      return tmp;
     }
 
     public override List<Node> Unpack()
@@ -227,11 +219,14 @@ namespace Plexer
     {
       string res = inner ? "(" : base.ToString() + ": ";
       res += string.Join(" | ", Nodes.Select(n => n.ToString(true)));
-      return $"{res}{(inner ? ")" : "")}{(IsOptional ? "?" : "")}{(inner ? "" : ";")}";
+      return $"{res}{(inner ? ")" : "")}{NodeOptions.ToString(Option)}{(inner ? "" : ";")}";
     }
 
     public Collection()
       : base() { }
+
+    public Collection(Collection collection)
+      : base(collection) => Nodes = collection.Nodes;
 
     public Collection(string name)
       : base(name) { }
